@@ -1,0 +1,54 @@
+# Phase 1 + Phase 2 on the real cross-matched Legacy Surveys x DESI dataset (single GPU).
+
+data:
+  aligned_dir: aligned/legacy_desi     # produced by build_crossmatch.py
+  image:
+    bands: [g, r, z]                   # Legacy Surveys grz -> CLIP 3 channels
+    image_size: 224
+    arcsinh_scale: 0.1                 # per-band arcsinh stretch scale
+  spectrum:
+    wavelength_min: 3600.0
+    wavelength_max: 9800.0
+    n_bins: 1024
+
+image_encoder:
+  type: clip
+  model_name: openai/clip-vit-large-patch14
+  select_layer: -2
+  select_feature: pooled               # pooled | patch_mean
+
+spectrum_encoder:
+  hidden_channels: [64, 128, 256]
+  kernel_size: 5
+  embedding_dim: 512
+
+projection:
+  shared_dim: 512
+  hidden_dim: 512
+
+model:
+  temperature_init: 0.07               # CLIP-style; stored as a learnable log-temperature
+  device: cuda
+  torch_dtype: bfloat16
+
+training:
+  output_dir: ./checkpoints/align
+  num_epochs: 30
+  per_device_batch_size: 128
+  gradient_accumulation_steps: 1
+  learning_rate: 5.0e-4
+  warmup_ratio: 0.03
+  weight_decay: 0.05
+  max_grad_norm: 1.0
+  bf16: true
+  logging_steps: 10
+  eval_steps: 100
+  save_steps: 100
+  eval_num_samples: 0                  # 0 = score the whole val split each eval
+  dataloader_num_workers: 4
+  seed: 42
+
+eval:
+  recall_ks: [1, 5, 10]
+  probe_targets: [redshift]
+  metrics_dir: ./metrics/align

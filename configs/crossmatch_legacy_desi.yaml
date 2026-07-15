@@ -1,0 +1,39 @@
+# Phase 0: cross-match Legacy Surveys images against DESI spectra on sky position.
+#
+# The exact HATS catalog paths must be resolved and VERIFIED against the collection
+# https://huggingface.co/collections/UniverseTBD/multimodal-universe-hats
+# before running. Base (non-HATS) datasets are MultimodalUniverse/legacysurvey and
+# MultimodalUniverse/desi. Column names below are the values the loader reads; confirm
+# them against the opened catalog (crossmatch/lsdb_match.py logs the available columns).
+
+image_catalog:
+  hats_path: "VERIFY://UniverseTBD/legacysurvey-hats"   # resolve exact HATS path/URL
+  base_hf_id: MultimodalUniverse/legacysurvey
+  ra_column: ra
+  dec_column: dec
+  image_column: image            # multi-band (g, r, z) pixel array
+  extra_columns: []
+
+spectrum_catalog:
+  hats_path: "VERIFY://UniverseTBD/desi-hats"           # resolve exact HATS path/URL
+  base_hf_id: MultimodalUniverse/desi
+  ra_column: ra
+  dec_column: dec
+  flux_column: flux              # spectrum flux array
+  wavelength_column: lambda      # spectrum wavelength grid
+  redshift_column: redshift      # spectroscopic redshift (primary probe target)
+  extra_columns: []
+
+match:
+  radius_arcsec: 1.0             # standard optical same-object radius; matches the blog example
+  n_neighbors: 1
+
+output:
+  output_dir: aligned/legacy_desi
+  shard_size: 512                # objects per .npz shard
+  n_objects: 20000              # cap for laptop-scale prototyping (raise on a bigger machine)
+
+split:
+  seed: 42
+  val_fraction: 0.1
+  test_fraction: 0.1

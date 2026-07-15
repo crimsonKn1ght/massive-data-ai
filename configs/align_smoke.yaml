@@ -1,0 +1,55 @@
+# Synthetic CPU smoke config: exercises the full Phase 1 + Phase 2 pipeline with no
+# downloads and no GPU. The image encoder is a fixed (frozen) flatten+projection so CLIP
+# weights are never fetched; the synthetic dataset embeds a shared latent in each image and
+# spectrum so alignment is genuinely learnable.
+
+data:
+  aligned_dir: aligned_smoke           # produced by: python build_crossmatch.py --synthetic
+  image:
+    bands: [g, r, z]
+    image_size: 16                     # tiny synthetic images
+    arcsinh_scale: 0.1
+  spectrum:
+    wavelength_min: 3600.0
+    wavelength_max: 9800.0
+    n_bins: 128
+
+image_encoder:
+  type: flatten                        # frozen flatten + fixed random projection (no CLIP download)
+  output_dim: 64
+
+spectrum_encoder:
+  hidden_channels: [32, 64]
+  kernel_size: 5
+  embedding_dim: 64
+
+projection:
+  shared_dim: 32
+  hidden_dim: 64
+
+model:
+  temperature_init: 0.07
+  device: cpu
+  torch_dtype: float32
+
+training:
+  output_dir: ./checkpoints/smoke
+  num_epochs: 40
+  per_device_batch_size: 32
+  gradient_accumulation_steps: 1
+  learning_rate: 1.0e-3
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  bf16: false
+  logging_steps: 5
+  eval_steps: 20
+  save_steps: 20
+  eval_num_samples: 0
+  dataloader_num_workers: 0
+  seed: 42
+
+eval:
+  recall_ks: [1, 5, 10]
+  probe_targets: [redshift]
+  metrics_dir: ./metrics/smoke

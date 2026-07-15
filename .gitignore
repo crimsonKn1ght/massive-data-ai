@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Built aligned datasets and shards
+aligned/
+aligned_*/
+*.npz
+
+# Training artifacts
+checkpoints/
+metrics/
+*.log
+
+# LSDB / HATS local caches
+.lsdb_cache/
+hats_cache/
+
+# OS
+.DS_Store

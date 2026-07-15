@@ -1,0 +1,17 @@
+# Core (Phase 1 baselines + Phase 2 alignment training). Enough to run the synthetic
+# smoke path end to end on CPU.
+numpy>=1.24
+pyyaml>=6.0
+torch>=2.1
+safetensors>=0.4
+accelerate>=0.30
+transformers>=4.40
+scikit-learn>=1.3
+pillow>=10.0
+
+# Real data access (Phase 0 cross-match against the Multimodal Universe HATS catalogs,
+# and Phase 1/2 on real surveys). Not required for the synthetic smoke path.
+datasets>=2.19
+lsdb>=0.4
+hats>=0.4
+astropy>=6.0
