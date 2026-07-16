@@ -1,0 +1,61 @@
+# Fast alignment training on precomputed CLIP features (frozen image tower cached once).
+#
+# Workflow:
+#   python precompute_features.py --config configs/align.yaml --out-dir aligned/legacy_desi_clipfeat
+#   python run_baseline.py --config configs/align_cached.yaml
+#   python train.py       --config configs/align_cached.yaml
+#   python evaluate.py    --config configs/align_cached.yaml --checkpoint checkpoints/align_cached/best
+#
+# The image tower is an identity passthrough over the cached features, so each step skips the image
+# load, resize, and CLIP forward - the dominant cost on a small GPU.
+
+data:
+  aligned_dir: aligned/legacy_desi_clipfeat   # produced by precompute_features.py
+  image:
+    bands: [g, r, z]                           # unused by the identity encoder; kept for parity
+    image_size: 224
+    arcsinh_scale: 0.1
+  spectrum:
+    wavelength_min: 3600.0
+    wavelength_max: 9800.0
+    n_bins: 1024
+
+image_encoder:
+  type: identity
+  output_dim: 1024                             # CLIP ViT-L/14 feature dim (must match precompute)
+
+spectrum_encoder:
+  hidden_channels: [64, 128, 256]
+  kernel_size: 5
+  embedding_dim: 512
+
+projection:
+  shared_dim: 512
+  hidden_dim: 512
+
+model:
+  temperature_init: 0.07
+  device: cuda
+  torch_dtype: bfloat16
+
+training:
+  output_dir: ./checkpoints/align_cached
+  num_epochs: 30
+  per_device_batch_size: 256                   # features are tiny; a large batch helps InfoNCE
+  gradient_accumulation_steps: 1
+  learning_rate: 5.0e-4
+  warmup_ratio: 0.03
+  weight_decay: 0.05
+  max_grad_norm: 1.0
+  bf16: true
+  logging_steps: 20
+  eval_steps: 100
+  save_steps: 100
+  eval_num_samples: 0
+  dataloader_num_workers: 4
+  seed: 42
+
+eval:
+  recall_ks: [1, 5, 10]
+  probe_targets: [redshift]
+  metrics_dir: ./metrics/align_cached

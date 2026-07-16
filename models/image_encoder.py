@@ -90,4 +90,29 @@ def build_image_encoder(image_cfg: Dict) -> nn.Module:
         )
     if encoder_type == "flatten":
         return FlattenImageEncoder(output_dim=int(image_cfg.get("output_dim", 64)))
-    raise ValueError(f"Unknown image_encoder type {encoder_type!r} (clip | flatten)")
+    if encoder_type == "identity":
+        return IdentityImageEncoder(output_dim=int(image_cfg["output_dim"]))
+    raise ValueError(f"Unknown image_encoder type {encoder_type!r} (clip | flatten | identity)")
+
+
+class IdentityImageEncoder(nn.Module):
+    """Passthrough tower for precomputed image features (see precompute_features.py).
+
+    When the frozen image features have been cached, training/eval load them directly instead of
+    running the CLIP forward each step, which is the dominant cost on a small GPU. The dataset yields
+    the feature vector as the "image", so ``embed`` just returns it (detached).
+    """
+
+    def __init__(self, output_dim: int):
+        super().__init__()
+        self.output_dim = output_dim
+
+    def build_transform(self, image_cfg: Dict) -> Callable[[np.ndarray], torch.Tensor]:
+        def transform(array: np.ndarray) -> torch.Tensor:
+            return torch.from_numpy(np.asarray(array, dtype=np.float32)).reshape(-1)
+
+        return transform
+
+    @torch.no_grad()
+    def embed(self, pixel_values: torch.Tensor) -> torch.Tensor:
+        return pixel_values.detach()
