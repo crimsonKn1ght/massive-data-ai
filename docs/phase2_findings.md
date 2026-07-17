@@ -139,6 +139,33 @@ Bottom line: more data helped as predicted. A gap of ~1.2 remains and absolute r
 modest, so the remaining levers are regularization (now cheap, knobs wired below) and the frozen image
 tower (image probe R2 ~0.67 is the ceiling).
 
+## Regularization A/B result
+
+Testing recommendation 1 on the 110k model (`configs/align_cached_reg.yaml`: dropout 0.2 in the
+projection heads and spectrum encoder, train-only spectrum noise 0.1 and bin masking 0.15, weight
+decay 0.1):
+
+| metric | baseline (110k) | regularized |
+|---|---|---|
+| train loss | 2.96 | 3.80 |
+| val loss | 4.17 | 4.005 |
+| train/val gap | 1.21 | 0.20 |
+| pooled recall@1 (2000) | 0.0176 | 0.0142 |
+| pooled recall@10 (2000) | 0.1186 | 0.1056 |
+| image probe R2 | 0.659 | 0.684 |
+
+Regularization did what it says - it almost closed the train/val gap (1.21 -> 0.20) - but retrieval did
+not improve; it dropped slightly, while the redshift probe R2 nudged up. Per the test in recommendation
+1, this is the "gap closes but retrieval does not move" outcome: at 110k pairs, overfitting is no
+longer the retrieval bottleneck - the frozen CLIP image tower is (image probe R2 0.67 vs spectrum
+0.84). Lighter regularization could recover the small retrieval loss, but it will not break the
+ceiling. The highest remaining lever is the image encoder (recommendation 3).
+
+Caveat from this run: inserting a Dropout into the projection MLP briefly renumbered the output Linear
+(`mlp.2` -> `mlp.3`), so a pre-dropout checkpoint loaded with that layer left at random init and read
+chance recall (0.0005) until reloaded correctly. Fixed by naming the projection Linears so Dropout does
+not shift them, plus a warning on any unmatched key in `load_trainable_state_dict`.
+
 ## Recommended next steps (ordered by leverage vs cost)
 
 Iteration is now ~1 minute per full run, so the cheap levers are worth trying first.
