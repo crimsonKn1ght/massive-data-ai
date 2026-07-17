@@ -109,8 +109,15 @@ Iteration is now ~1 minute per full run, so the cheap levers are worth trying fi
    and recall@5/@10 rise. If recall does not move while the gap closes, the ceiling (step 4 above) is
    binding, not overfitting.
 
-2. **More matched pairs (moderate).** 16k pairs is small for contrastive learning; more data directly
-   attacks overfitting. See "Counting available matches" below before committing to a bigger build.
+2. **More matched pairs (now the top lever).** The crossmatch yields ~137,600 good pairs (see
+   "Counting available matches"), about 7x the 20k currently used. 16k train pairs is small for
+   contrastive learning and the run is demonstrably overfitting, so building the full set directly
+   attacks the gap and gives the loss far more negatives and diversity. Rebuild via
+   `build_crossmatch.py` -> `precompute_features.py` -> `run_baseline.py` -> `train.py` ->
+   `evaluate.py`. Two practical notes: the raw build is on the order of 40 GB and the CLIP precompute
+   runs once over ~138k images (GPU-bound); and with `shard_cache_size: 0` the cached set (~a few GB)
+   is held in RAM per dataloader worker, so watch RAM against `dataloader_num_workers` (reduce workers
+   or set a finite cache that still covers all shards if memory is tight).
 
 3. **Replace or unfreeze the image tower (highest ceiling, biggest cost).** Swap frozen CLIP for a
    galaxy-appropriate image encoder (AstroCLIP / DINO trained on galaxy cutouts) or fine-tune part of
@@ -146,5 +153,29 @@ print("good quality (ZWARN == 0):", int((df[zwarn] == 0).sum()))
 Set a Hugging Face token first (`export HF_TOKEN=...`) to avoid rate-limited 504s. The good-quality
 count is the usable ceiling (`crossmatched_records` skips `ZWARN != 0`). To then build more, raise
 `output.n_objects` and rerun `build_crossmatch.py`, `precompute_features.py`, `run_baseline.py`,
-`train.py`, `evaluate.py`. If the count is only marginally above 20000, "more data" is not a lever and
-attention should go to regularization (step 1) and the image tower (step 3).
+`train.py`, `evaluate.py`.
+
+Measured result (Legacy-north x DESI-EDR-SV3, radius 1.0 arcsec): **137,906 total matches, 137,622
+good (ZWARN == 0), 0 skipped tiles**. That is about 7x the 20k currently used, so "more data" is a real
+lever (recommendation 2). A first attempt at the full count died with a transient
+`FileNotFoundError` on one HATS tile (`Npix=9985`); a rerun read it fine, so it was an HF hiccup, not a
+missing file. A full ~138k build streams far more tiles over a multi-hour run, so a transient read
+error becoming fatal is a real risk - see the resilience note below.
+
+### Build resilience for large runs
+
+`crossmatch/lsdb_match.py::_iter_partitions` computes each partition with no error handling, so a
+single transient tile read failure aborts the whole build after streaming thousands of objects. For a
+138k build this is worth hardening: retry each partition a few times with backoff (handles the
+transient case observed above), skip with a logged warning only after retries are exhausted, and abort
+the whole build if the skipped-tile count exceeds a small threshold (so a decimated dataset never
+passes silently). Not yet applied.
+
+### Comparing across dataset sizes
+
+Retrieval difficulty scales with the number of candidates: chance recall@1 is `1/N_test` and random
+median rank is `N_test/2`. A 138k build with the same 10/10 split has an ~13.7k test set, so recall@k
+will look lower than the 2k-test numbers here even for a strictly better model. To compare model
+quality across dataset sizes, evaluate over a fixed-size candidate pool (e.g. average recall over
+several random 2000-object subsets of the test split) or report the rank percentile
+(`median_rank / N_test`) rather than raw recall@k.
