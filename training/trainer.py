@@ -58,6 +58,9 @@ class AlignmentTrainer:
 
     def train(self) -> None:
         collator = AlignedCollator()
+        # persistent_workers keeps the (fork-copied) worker shard caches warm across epochs instead of
+        # rebuilding them from scratch each epoch; only valid when workers are actually spawned.
+        persistent = self.dataloader_num_workers > 0
         train_loader = DataLoader(
             self.train_dataset,
             batch_size=self.per_device_batch_size,
@@ -65,6 +68,7 @@ class AlignmentTrainer:
             num_workers=self.dataloader_num_workers,
             collate_fn=collator,
             drop_last=True,
+            persistent_workers=persistent,
         )
         val_loader = None
         if self.val_dataset is not None and len(self.val_dataset) > 0:
@@ -75,6 +79,7 @@ class AlignmentTrainer:
                 num_workers=self.dataloader_num_workers,
                 collate_fn=collator,
                 drop_last=False,
+                persistent_workers=persistent,
             )
 
         num_update_steps_per_epoch = max(1, len(train_loader) // self.gradient_accumulation_steps)

@@ -47,4 +47,5 @@ def build_dataset(
         split=split,
         image_transform=image_transform,
         spectrum_transform=spectrum_transform,
+        shard_cache_size=int(config["data"].get("shard_cache_size", 16)),
     )

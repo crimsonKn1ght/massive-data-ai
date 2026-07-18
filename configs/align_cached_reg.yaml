@@ -1,0 +1,65 @@
+# Regularized variant of align_cached.yaml for the overfitting A/B (see docs/phase2_findings.md).
+#
+# Identical to align_cached.yaml except the regularization knobs are on and the output/metrics dirs
+# are separate, so this run does NOT overwrite the baseline checkpoints or metrics. Compare its final
+# train/val loss and pooled retrieval against the all-defaults baseline recorded in the doc.
+#
+#   python train.py           --config configs/align_cached_reg.yaml
+#   python evaluate.py        --config configs/align_cached_reg.yaml --checkpoint checkpoints/align_cached_reg/best
+#   python scripts/pooled_retrieval.py --config configs/align_cached_reg.yaml --checkpoint checkpoints/align_cached_reg/best
+
+data:
+  aligned_dir: aligned/legacy_desi_clipfeat
+  shard_cache_size: 0
+  image:
+    bands: [g, r, z]
+    image_size: 224
+    arcsinh_scale: 0.1
+  spectrum:
+    wavelength_min: 3600.0
+    wavelength_max: 9800.0
+    n_bins: 1024
+
+image_encoder:
+  type: identity
+  output_dim: 1024
+
+spectrum_encoder:
+  hidden_channels: [64, 128, 256]
+  kernel_size: 5
+  embedding_dim: 512
+  dropout: 0.2                    # regularization: on for this A/B
+  augment_noise_std: 0.1          # train-only Gaussian noise on the normalized flux
+  augment_mask_frac: 0.15         # train-only random bin masking
+
+projection:
+  shared_dim: 512
+  hidden_dim: 512
+  dropout: 0.2                    # dropout inside both projection heads
+
+model:
+  temperature_init: 0.07
+  device: cuda
+  torch_dtype: bfloat16
+
+training:
+  output_dir: ./checkpoints/align_cached_reg   # separate: keeps the baseline best/ intact
+  num_epochs: 30
+  per_device_batch_size: 256
+  gradient_accumulation_steps: 1
+  learning_rate: 5.0e-4
+  warmup_ratio: 0.03
+  weight_decay: 0.1              # raised from the 0.05 baseline
+  max_grad_norm: 1.0
+  bf16: true
+  logging_steps: 20
+  eval_steps: 100
+  save_steps: 100
+  eval_num_samples: 0
+  dataloader_num_workers: 4
+  seed: 42
+
+eval:
+  recall_ks: [1, 5, 10]
+  probe_targets: [redshift]
+  metrics_dir: ./metrics/align_cached_reg      # separate metrics dir

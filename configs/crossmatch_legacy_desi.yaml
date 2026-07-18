@@ -33,7 +33,9 @@ match:
 output:
   output_dir: aligned/legacy_desi
   shard_size: 512                # objects per .npz shard
-  n_objects: 20000               # cap for laptop-scale prototyping (raise on a bigger machine)
+  n_objects: 140000              # full build: takes all ~137.6k good (ZWARN==0) matches. This streams
+                                 # ~40 GB from HuggingFace and is not laptop-scale; for a quick trial
+                                 # lower it (e.g. 20000). See docs/phase2_findings.md.
 
 split:
   seed: 42

@@ -37,6 +37,11 @@ class AlignedPairDataset(Dataset):
         self.redshift_key = redshift_key
         self.entries: List[ManifestEntry] = self._load_entries(aligned_dir, split)
         self._cache: "OrderedDict[str, Dict[str, np.ndarray]]" = OrderedDict()
+        # A bounded LRU keeps the streaming footprint small for the huge raw dataset. Precomputed
+        # feature shards are tiny, though, and the shuffled loader touches every shard each step, so a
+        # 16-shard cache thrashes (re-decompressing shards every batch) and starves the GPU. Setting
+        # shard_cache_size <= 0 keeps every shard resident (load-once), which is the right choice for
+        # the cached-feature path where the whole dataset comfortably fits in RAM.
         self._cache_size = shard_cache_size
 
     @staticmethod
@@ -62,7 +67,7 @@ class AlignedPairDataset(Dataset):
         with np.load(os.path.join(self.shard_dir, name)) as data:
             arrays = {key: data[key] for key in _SHARD_KEYS}
         self._cache[name] = arrays
-        if len(self._cache) > self._cache_size:
+        if self._cache_size > 0 and len(self._cache) > self._cache_size:
             self._cache.popitem(last=False)
         return arrays
 

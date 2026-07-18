@@ -11,6 +11,9 @@
 
 data:
   aligned_dir: aligned/legacy_desi_clipfeat   # produced by precompute_features.py
+  shard_cache_size: 0                          # cached features are tiny: keep every shard resident
+                                               # (0 = unbounded) so the shuffled loader stops
+                                               # re-decompressing shards each step and the GPU stays fed
   image:
     bands: [g, r, z]                           # unused by the identity encoder; kept for parity
     image_size: 224
@@ -28,10 +31,17 @@ spectrum_encoder:
   hidden_channels: [64, 128, 256]
   kernel_size: 5
   embedding_dim: 512
+  # Regularization to close the train/val gap (all default 0.0 = off). Train-only augmentation is
+  # applied only in training mode. Suggested starting sweep: dropout 0.1-0.3, augment_noise_std
+  # 0.05-0.2, augment_mask_frac 0.1-0.3.
+  dropout: 0.0
+  augment_noise_std: 0.0        # Gaussian noise added to the normalized flux during training
+  augment_mask_frac: 0.0        # fraction of flux bins randomly zeroed during training
 
 projection:
   shared_dim: 512
   hidden_dim: 512
+  dropout: 0.0                   # dropout inside both projection heads (try 0.1-0.3); weight_decay below also helps
 
 model:
   temperature_init: 0.07
